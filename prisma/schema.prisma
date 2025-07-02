@@ -22,3 +22,37 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model Admin {
+  id               String             @id @default(uuid())
+  email            String?            @unique
+  name             String?
+  password         String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  registrationCode RegistrationCode[]
+  module           Module[]
+}
+
+model RegistrationCode {
+  id        String   @id @default(uuid())
+  code      String
+  adminId   String
+  expiresAt DateTime @default(dbgenerated("now() + interval '1 day'"))
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+}
+
+model Module {
+  id          String   @id @default(uuid())
+  name        String?
+  description String?
+  macAddress  String   @unique
+  adminId     String?
+  admin       Admin?   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
