@@ -13,7 +13,6 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import * as argon2 from 'argon2';
 import { Admin } from 'generated/prisma';
 import { RegisterAdminDto } from './dto/register-admin.dto';
-import { CreateAdminShellDto } from './dto/create-admin-shell.dto';
 
 @Injectable()
 export class AdminAuthService {
@@ -65,36 +64,16 @@ export class AdminAuthService {
   }
 
   async register(registerAdminDto: RegisterAdminDto) {
-    const { email, password, name, code } = registerAdminDto;
+    const { email, password, name } = registerAdminDto;
     const existingAdmin = await this.verifyAdminEmail(email);
 
     if (existingAdmin) {
       throw new EmailAlreadyExistsException();
     }
 
-    const latestCode = await this.prisma.registrationCode.findFirst({
-      where: {
-        code,
-        isUsed: false,
-        expiresAt: {
-          gte: new Date(),
-        },
-      },
-      include: {
-        admin: true,
-      },
-    });
-
-    if (!latestCode) {
-      throw new InvalidCredentialsException();
-    }
-
     const hashedPassword = await argon2.hash(password);
 
-    const admin = await this.prisma.admin.update({
-      where: {
-        id: latestCode.admin.id,
-      },
+    const admin = await this.prisma.admin.create({
       data: {
         email,
         password: hashedPassword,
@@ -102,43 +81,10 @@ export class AdminAuthService {
       },
     });
 
-    const registrationCode = await this.prisma.registrationCode.update({
-      where: { id: latestCode.id },
-      data: { isUsed: true },
-    });
-
-    if (!registrationCode) {
-      throw new InternalServerErrorException();
-    }
-
-    return this.login(admin);
-  }
-
-  async createAdminShell(createAdminShellDto: CreateAdminShellDto) {
-    const { macAddress } = createAdminShellDto;
-
-    const deviceModule = await this.prisma.module.findUnique({
-      where: { macAddress },
-    });
-
-    if (!deviceModule) {
-      throw new NotFoundException();
-    }
-
-    const admin = await this.prisma.admin.create({
-      data: {
-        module: {
-          connect: {
-            id: deviceModule.id,
-          },
-        },
-      },
-    });
-
     if (!admin) {
       throw new InternalServerErrorException();
     }
 
-    return admin;
+    return this.login(admin);
   }
 }
