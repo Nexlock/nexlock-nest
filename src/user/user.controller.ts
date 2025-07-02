@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Post,
   Request,
   UseGuards,
@@ -25,5 +26,11 @@ export class UserController {
   @Post('login')
   async login(@Request() req: { user: any }) {
     return this.userService.login(req.user);
+  }
+
+  @Get('info')
+  async getUserInfo(@Request() req: { user: any }) {
+    const user = req.user;
+    return user;
   }
 }
