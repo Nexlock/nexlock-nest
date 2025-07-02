@@ -22,9 +22,11 @@ export class UserService {
       where: { email },
     });
 
-    if (user) {
-      return user;
+    if (!user) {
+      return new UserNotFoundException();
     }
+
+    return user;
   }
 
   async validateUser(email: string, password: string) {
