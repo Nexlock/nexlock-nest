@@ -45,7 +45,7 @@ model Module {
   admin           Admin?            @relation(fields: [adminId], references: [id], onDelete: Cascade)
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
-  Locker          Locker[]
+  lockers         Locker[]
   oneTimePassword OneTimePassword[]
 }
 
