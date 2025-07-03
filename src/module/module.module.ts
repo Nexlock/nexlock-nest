@@ -2,9 +2,12 @@ import { Module } from '@nestjs/common';
 import { ModuleGateway } from './module.gateway';
 import { ModuleService } from './module.service';
 import { ModuleController } from './module.controller';
+import { SetupModule } from 'src/setup/setup.module';
+import { SetupService } from 'src/setup/setup.service';
 
 @Module({
-  providers: [ModuleGateway, ModuleService],
-  controllers: [ModuleController]
+  imports: [SetupModule],
+  providers: [ModuleGateway, ModuleService, SetupService],
+  controllers: [ModuleController],
 })
 export class ModuleModule {}
