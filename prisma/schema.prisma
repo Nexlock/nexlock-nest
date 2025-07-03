@@ -15,12 +15,14 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String         @id @default(uuid())
+  email        String         @unique
+  name         String
+  password     String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  lockerRental LockerRental[]
+  accessQrCode AccessQrCode[]
 }
 
 model Admin {
@@ -48,12 +50,13 @@ model Module {
 }
 
 model Locker {
-  id        String   @id @default(uuid())
-  isOpen    Boolean  @default(false)
-  moduleId  String
-  module    Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String         @id @default(uuid())
+  isOpen       Boolean        @default(false)
+  moduleId     String
+  module       Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  lockerRental LockerRental[]
 }
 
 model OneTimePassword {
@@ -67,4 +70,28 @@ model OneTimePassword {
   module    Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model LockerRental {
+  id           String         @id @default(uuid())
+  lockerId     String
+  locker       Locker         @relation(fields: [lockerId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startTime    DateTime       @default(now())
+  endTime      DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  accessQrCode AccessQrCode[]
+}
+
+model AccessQrCode {
+  id             String       @id @default(uuid())
+  qrCode         String       @unique
+  lockerRentalId String
+  lockerRental   LockerRental @relation(fields: [lockerRentalId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }
