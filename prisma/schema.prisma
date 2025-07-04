@@ -1,0 +1,96 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  name         String
+  password     String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  lockerRental LockerRental[]
+  accessQrCode AccessQrCode[]
+}
+
+model Admin {
+  id              String            @id @default(uuid())
+  email           String            @unique
+  name            String
+  password        String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  module          Module[]
+  oneTimePassword OneTimePassword[]
+}
+
+model Module {
+  id              String            @id @default(uuid())
+  name            String?
+  description     String?
+  macAddress      String            @unique
+  adminId         String?
+  admin           Admin?            @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  lockers         Locker[]
+  oneTimePassword OneTimePassword[]
+}
+
+model Locker {
+  id           String         @id @default(uuid())
+  isOpen       Boolean        @default(false)
+  moduleId     String
+  module       Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  lockerRental LockerRental[]
+}
+
+model OneTimePassword {
+  id        String   @id @default(uuid())
+  otp       String
+  isUsed    Boolean  @default(false)
+  expiresAt DateTime @default(dbgenerated("now() + interval '1 day'"))
+  adminId   String?
+  admin     Admin?   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  moduleId  String
+  module    Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LockerRental {
+  id           String         @id @default(uuid())
+  lockerId     String
+  locker       Locker         @relation(fields: [lockerId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startTime    DateTime       @default(now())
+  endTime      DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  accessQrCode AccessQrCode[]
+}
+
+model AccessQrCode {
+  id             String       @id @default(uuid())
+  qrCode         String       @unique
+  lockerRentalId String
+  lockerRental   LockerRental @relation(fields: [lockerRentalId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
