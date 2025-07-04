@@ -49,8 +49,8 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       // Verify OTP and get the module
       const oneTimePassword = await this.setupService.findValidOtp(
-        data.macAddress,
-        data.otp,
+        data.otp, // Changed: otp should be first parameter
+        data.macAddress, // Changed: macAddress should be second parameter
       );
 
       if (!oneTimePassword) {
@@ -67,9 +67,11 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Store the client with module mapping
       this.connectedModules.set(oneTimePassword.module.id, client);
 
+      // This message IS sent to the ESP32 module
       this.sendMessage(client, {
         type: 'module-registered',
         moduleId: oneTimePassword.module.id,
+        macAddress: oneTimePassword.module.macAddress, // Added: include macAddress
         message: 'Module registered successfully',
       });
 
