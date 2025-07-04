@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import {
   EmailAlreadyExistsException,
@@ -11,7 +7,7 @@ import {
 } from 'src/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as argon2 from 'argon2';
-import { Admin } from 'generated/prisma';
+import { Admin } from '@prisma/client';
 import { RegisterAdminDto } from './dto/register-admin.dto';
 
 @Injectable()
@@ -27,7 +23,7 @@ export class AdminAuthService {
     });
 
     if (!admin) {
-      return new UserNotFoundException();
+      return null;
     }
 
     return admin;
@@ -39,13 +35,13 @@ export class AdminAuthService {
     });
 
     if (!admin || !admin.password) {
-      return new UserNotFoundException();
+      throw new UserNotFoundException();
     }
 
     const validPassword = await argon2.verify(admin.password, password);
 
     if (!validPassword) {
-      return new InvalidCredentialsException();
+      throw new InvalidCredentialsException();
     }
 
     return admin;

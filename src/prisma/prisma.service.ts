@@ -1,5 +1,5 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { PrismaClient } from 'generated/prisma';
+import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class PrismaService
@@ -14,15 +14,7 @@ export class PrismaService
       return PrismaService.instance;
     }
 
-    super({
-      datasources: {
-        db: {
-          url:
-            process.env.DATABASE_URL +
-            '?connection_limit=1&pool_timeout=20&pgbouncer=true',
-        },
-      },
-    });
+    super();
 
     PrismaService.instance = this;
   }

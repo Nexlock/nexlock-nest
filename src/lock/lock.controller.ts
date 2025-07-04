@@ -14,12 +14,45 @@ export class LockController {
   async toggleLock(@Body() toggleLockDto: ToggleLockDto) {
     const updatedLocker = await this.lockService.toggleLock(toggleLockDto);
 
-    const updatedLockerDto = {
-      lockerId: updatedLocker.id,
-      macAddress: toggleLockDto.macAddress,
-      isOpen: updatedLocker.isOpen,
-    };
+    // Send lock/unlock command to the connected module
+    this.moduleGateway.sendLockCommand(
+      updatedLocker.moduleId,
+      updatedLocker.id,
+      !updatedLocker.isOpen, // Send lock command if locker should be locked (isOpen = false)
+    );
 
-    this.moduleGateway.handleToggleLock(updatedLockerDto);
+    return {
+      success: true,
+      locker: updatedLocker,
+      action: updatedLocker.isOpen ? 'unlocked' : 'locked',
+    };
+  }
+
+  @Post('lock')
+  async lockLocker(@Body() { lockerId }: { lockerId: string }) {
+    const locker = await this.lockService.lockLocker(lockerId);
+
+    // Send lock command to the connected module
+    this.moduleGateway.sendLockCommand(locker.moduleId, locker.id, true); // Lock the locker
+
+    return {
+      success: true,
+      locker,
+      action: 'locked',
+    };
+  }
+
+  @Post('unlock')
+  async unlockLocker(@Body() { lockerId }: { lockerId: string }) {
+    const locker = await this.lockService.unlockLocker(lockerId);
+
+    // Send unlock command to the connected module
+    this.moduleGateway.sendLockCommand(locker.moduleId, locker.id, false); // Unlock the locker
+
+    return {
+      success: true,
+      locker,
+      action: 'unlocked',
+    };
   }
 }

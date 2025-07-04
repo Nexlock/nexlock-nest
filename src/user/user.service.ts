@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
-import { User } from 'generated/prisma';
+import { User } from '@prisma/client';
 import {
   EmailAlreadyExistsException,
   InvalidCredentialsException,
@@ -23,7 +23,7 @@ export class UserService {
     });
 
     if (!user) {
-      return new UserNotFoundException();
+      throw new UserNotFoundException();
     }
 
     return user;
@@ -35,13 +35,13 @@ export class UserService {
     });
 
     if (!user) {
-      return new UserNotFoundException();
+      throw new UserNotFoundException();
     }
 
     const validPassword = await argon2.verify(user.password, password);
 
     if (!validPassword) {
-      return new InvalidCredentialsException();
+      throw new InvalidCredentialsException();
     }
 
     return user;

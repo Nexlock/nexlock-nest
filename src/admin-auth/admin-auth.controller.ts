@@ -14,6 +14,7 @@ import {
   registerAdminSchema,
 } from './dto/register-admin.dto';
 import { LocalAdminAuthGuard } from './guards/local-admin-auth.guard';
+import { JwtAdminAuthGuard } from './guards/jwt-admin-auth.guard';
 
 @Controller('admin-auth')
 export class AdminAuthController {
@@ -31,6 +32,7 @@ export class AdminAuthController {
     return this.adminAuthService.login(req.user);
   }
 
+  @UseGuards(JwtAdminAuthGuard)
   @Get('info')
   async getAdminInfo(@Request() req: { user: any }) {
     const user = req.user;

@@ -8,9 +8,23 @@ import { SetupModule } from './setup/setup.module';
 import { AccessCodeModule } from './access-code/access-code.module';
 import { ModuleModule } from './module/module.module';
 import { LockModule } from './lock/lock.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [PrismaModule, UserModule, AdminAuthModule, SetupModule, AccessCodeModule, ModuleModule, LockModule],
+  imports: [
+    PrismaModule,
+    UserModule,
+    AdminAuthModule,
+    SetupModule,
+    AccessCodeModule,
+    ModuleModule,
+    LockModule,
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env', '.env.local'],
+      cache: true,
+    }),
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

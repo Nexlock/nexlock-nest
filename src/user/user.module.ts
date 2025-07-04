@@ -13,6 +13,7 @@ import { JwtModule } from '@nestjs/jwt';
   imports: [
     PrismaModule,
     PassportModule,
+
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
@@ -22,6 +23,12 @@ import { JwtModule } from '@nestjs/jwt';
     }),
   ],
   controllers: [UserController],
-  providers: [UserService, PrismaService, LocalStrategy, JwtStrategy],
+  providers: [
+    UserService,
+    PrismaService,
+    LocalStrategy,
+    JwtStrategy,
+    ConfigService,
+  ],
 })
 export class UserModule {}

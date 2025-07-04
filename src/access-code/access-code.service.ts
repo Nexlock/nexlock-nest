@@ -17,7 +17,7 @@ export class AccessCodeService {
     });
 
     if (!accessQrCode) {
-      throw new InvalidQrException();
+      return null;
     }
 
     return accessQrCode;

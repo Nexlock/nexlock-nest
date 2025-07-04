@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { LockController } from './lock.controller';
 import { LockService } from './lock.service';
-import { ModuleGateway } from 'src/module/module.gateway';
 import { ModuleModule } from 'src/module/module.module';
+import { PrismaModule } from 'src/prisma/prisma.module';
 
 @Module({
-  imports: [ModuleModule],
+  imports: [ModuleModule, PrismaModule],
   controllers: [LockController],
-  providers: [LockService, ModuleGateway],
+  providers: [LockService],
 })
 export class LockModule {}
