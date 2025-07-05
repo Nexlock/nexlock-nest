@@ -9,6 +9,7 @@ import { AccessCodeModule } from './access-code/access-code.module';
 import { ModuleModule } from './module/module.module';
 import { LockModule } from './lock/lock.module';
 import { ConfigModule } from '@nestjs/config';
+import { RentalModule } from './rental/rental.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ConfigModule } from '@nestjs/config';
       envFilePath: ['.env', '.env.local'],
       cache: true,
     }),
+    RentalModule,
   ],
   controllers: [AppController],
   providers: [AppService],
