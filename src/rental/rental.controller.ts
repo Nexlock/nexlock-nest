@@ -3,6 +3,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -30,6 +31,16 @@ export class RentalController {
   @Get('module-all/:moduleId')
   async getAllRentalsByModule(@Param('moduleId') moduleId: string) {
     return this.rentalService.getAllActiveRentalsByModuleId(moduleId);
+  }
+
+  @UseGuards(JwtAdminAuthGuard)
+  @Get('history/:lockerId')
+  async getRentalHistoryByLockerId(
+    @Param('lockerId') lockerId: string,
+    @Query('limit') limit: string,
+  ) {
+    const limitNumber = parseInt(limit, 10) || 5;
+    return this.rentalService.getRentalHistoryByLockerId(lockerId, limitNumber);
   }
 
   @UseGuards(JwtAdminAuthGuard)

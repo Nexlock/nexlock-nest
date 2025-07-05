@@ -3,6 +3,7 @@ import {
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
 } from '@nestjs/websockets';
 import { Server } from 'ws';
 import * as WebSocket from 'ws';
@@ -13,17 +14,30 @@ import { Inject, forwardRef } from '@nestjs/common';
 @WebSocketGateway({
   path: '/ws',
 })
-export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class ModuleGateway
+  implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit
+{
   @WebSocketServer()
   server: Server;
 
-  private connectedModules = new Map<string, WebSocket>();
+  private connectedModules = new Map<
+    string,
+    { client: WebSocket; lastPing: number }
+  >();
   private pendingModules = new Map<string, WebSocket>(); // MAC -> WebSocket
+  private heartbeatInterval: NodeJS.Timeout;
 
   constructor(
     @Inject(forwardRef(() => SetupService))
     private setupService: SetupService,
   ) {}
+
+  afterInit(server: Server) {
+    this.heartbeatInterval = setInterval(
+      () => this.checkModuleHeartbeats(),
+      30000,
+    ); // Check every 30 seconds
+  }
 
   handleConnection(client: WebSocket) {
     console.log('WebSocket client connected');
@@ -47,8 +61,8 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
     console.log('WebSocket client disconnected');
 
     // Remove from connected modules
-    for (const [moduleId, socket] of this.connectedModules.entries()) {
-      if (socket === client) {
+    for (const [moduleId, socketInfo] of this.connectedModules.entries()) {
+      if (socketInfo.client === client) {
         this.connectedModules.delete(moduleId);
         console.log(`Module ${moduleId} disconnected`);
         break;
@@ -115,7 +129,7 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       if (module && module.adminId) {
         // Module is already registered, treat as a normal connection
-        this.connectedModules.set(module.id, client);
+        this.connectedModules.set(module.id, { client, lastPing: Date.now() });
         this.sendMessage(client, {
           type: 'module-registered',
           moduleId: module.id,
@@ -196,6 +210,13 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client: WebSocket,
     data: { moduleId?: string; timestamp?: number },
   ) {
+    if (data.moduleId) {
+      const moduleInfo = this.connectedModules.get(data.moduleId);
+      if (moduleInfo) {
+        moduleInfo.lastPing = Date.now();
+        this.connectedModules.set(data.moduleId, moduleInfo);
+      }
+    }
     this.sendMessage(client, {
       type: 'pong',
       timestamp: Date.now(),
@@ -208,7 +229,7 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (client && client.readyState === WebSocket.OPEN) {
       // Move from pending to connected
       this.pendingModules.delete(module.macAddress);
-      this.connectedModules.set(module.id, client);
+      this.connectedModules.set(module.id, { client, lastPing: Date.now() });
 
       // Send success response to ESP32
       this.sendMessage(client, {
@@ -230,7 +251,7 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // Method to send commands to modules from admin interface
   sendLockCommand(moduleId: string, lockerId: string, shouldLock: boolean) {
-    const client = this.connectedModules.get(moduleId);
+    const client = this.connectedModules.get(moduleId)?.client;
     if (client && client.readyState === WebSocket.OPEN) {
       const eventName = shouldLock ? 'lock-command' : 'unlock-command';
       this.sendMessage(client, {
@@ -250,28 +271,45 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // Method to broadcast to all connected modules
   broadcastToAllModules(message: any) {
-    for (const [moduleId, client] of this.connectedModules.entries()) {
-      if (client.readyState === WebSocket.OPEN) {
-        this.sendMessage(client, message);
+    for (const [moduleId, socketInfo] of this.connectedModules.entries()) {
+      if (socketInfo.client.readyState === WebSocket.OPEN) {
+        this.sendMessage(socketInfo.client, message);
       }
     }
   }
 
   // Get connection status for a specific module
   isModuleConnected(moduleId: string): boolean {
-    const client = this.connectedModules.get(moduleId);
+    const client = this.connectedModules.get(moduleId)?.client;
     return client ? client.readyState === WebSocket.OPEN : false;
   }
 
   // Get all connected module IDs
   getConnectedModules(): string[] {
     const connectedIds: string[] = [];
-    for (const [moduleId, client] of this.connectedModules.entries()) {
-      if (client.readyState === WebSocket.OPEN) {
+    for (const [moduleId, socketInfo] of this.connectedModules.entries()) {
+      if (socketInfo.client.readyState === WebSocket.OPEN) {
         connectedIds.push(moduleId);
       }
     }
     return connectedIds;
+  }
+
+  private checkModuleHeartbeats() {
+    const now = Date.now();
+    const timeout = 70000; // 70 seconds (ESP32 pings every 30s, requests status every 60s)
+
+    for (const [moduleId, socketInfo] of this.connectedModules.entries()) {
+      if (now - socketInfo.lastPing > timeout) {
+        console.log(
+          `Module ${moduleId} timed out. Last ping was ${
+            (now - socketInfo.lastPing) / 1000
+          }s ago. Disconnecting.`,
+        );
+        socketInfo.client.terminate(); // Force close the connection
+        this.connectedModules.delete(moduleId);
+      }
+    }
   }
 
   private sendMessage(client: WebSocket, message: any) {

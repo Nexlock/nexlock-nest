@@ -98,6 +98,18 @@ export class RentalService {
     return rentals;
   }
 
+  async getRentalHistoryByLockerId(lockerId: string, limit = 5) {
+    const rentals = await this.prisma.lockerRental.findMany({
+      where: { lockerId },
+      orderBy: {
+        startTime: 'desc',
+      },
+      take: limit,
+      include: { user: { select: { name: true, email: true } } },
+    });
+    return rentals;
+  }
+
   async getRentalById(rentalId: string) {
     const rental = await this.prisma.lockerRental.findUnique({
       where: { id: rentalId },
