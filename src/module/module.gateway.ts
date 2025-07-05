@@ -7,6 +7,7 @@ import {
 import { Server } from 'ws';
 import * as WebSocket from 'ws';
 import { SetupService } from '../setup/setup.service';
+import { Module } from '@prisma/client';
 
 @WebSocketGateway({
   path: '/ws',
@@ -16,6 +17,7 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   private connectedModules = new Map<string, WebSocket>();
+  private pendingModules = new Map<string, WebSocket>(); // MAC -> WebSocket
 
   constructor(private setupService: SetupService) {}
 
@@ -48,6 +50,15 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
         break;
       }
     }
+
+    // Remove from pending modules
+    for (const [macAddress, socket] of this.pendingModules.entries()) {
+      if (socket === client) {
+        this.pendingModules.delete(macAddress);
+        console.log(`Pending module with MAC ${macAddress} disconnected`);
+        break;
+      }
+    }
   }
 
   private async handleRawMessage(client: WebSocket, message: any) {
@@ -59,8 +70,8 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     switch (message.type) {
-      case 'module-register':
-        await this.handleModuleRegister(client, message);
+      case 'module-connect':
+        await this.handleModuleConnect(client, message);
         break;
       case 'locker-status-update':
         await this.handleLockerStatusUpdate(client, message);
@@ -80,50 +91,52 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  private async handleModuleRegister(
+  private async handleModuleConnect(
     client: WebSocket,
-    data: { macAddress: string; otp: string },
+    data: { macAddress: string },
   ) {
-    console.log('Module registration attempt:', data);
+    console.log('Module connection attempt:', data);
+    const { macAddress } = data;
+
+    if (!macAddress) {
+      this.sendMessage(client, {
+        type: 'connection-failed',
+        error: 'MAC address is required',
+      });
+      return;
+    }
 
     try {
-      // Verify OTP and get the module
-      const oneTimePassword = await this.setupService.findValidOtp(
-        data.otp,
-        data.macAddress,
-      );
+      const module = await this.setupService.findModuleByMacAddress(data);
 
-      if (!oneTimePassword) {
+      if (module && module.adminId) {
+        // Module is already registered, treat as a normal connection
+        this.connectedModules.set(module.id, client);
         this.sendMessage(client, {
-          type: 'registration-failed',
-          error: 'Invalid or expired OTP',
+          type: 'module-registered',
+          moduleId: module.id,
+          message: 'Module reconnected successfully',
         });
-        return;
+        console.log(`Module ${module.id} reconnected.`);
+      } else {
+        // Module is not registered yet, keep it in a pending state
+        this.pendingModules.set(macAddress, client);
+        this.sendMessage(client, {
+          type: 'connection-acknowledged',
+          message: 'Awaiting registration via admin panel',
+        });
+        console.log(`Module with MAC ${macAddress} is pending registration.`);
       }
-
-      // Mark OTP as used
-      await this.setupService.markOtpAsUsed(oneTimePassword.id);
-
-      // Store the client with module mapping
-      this.connectedModules.set(oneTimePassword.module.id, client);
-
-      // Send success response to ESP32
-      this.sendMessage(client, {
-        type: 'module-registered',
-        moduleId: oneTimePassword.module.id,
-        macAddress: oneTimePassword.module.macAddress,
-        message: 'Module registered successfully',
-      });
-
-      console.log(
-        `Module ${oneTimePassword.module.id} registered successfully`,
-      );
     } catch (error) {
-      console.error('Registration error:', error);
+      // Module does not exist in DB yet, also pending
+      this.pendingModules.set(macAddress, client);
       this.sendMessage(client, {
-        type: 'registration-failed',
-        error: 'Registration failed',
+        type: 'connection-acknowledged',
+        message: 'Awaiting registration via admin panel',
       });
+      console.log(
+        `Module with MAC ${macAddress} is pending registration (not in DB).`,
+      );
     }
   }
 
@@ -183,6 +196,32 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
       type: 'pong',
       timestamp: Date.now(),
     });
+  }
+
+  // Method to be called by SetupService after successful registration
+  notifyModuleRegistered(module: Module) {
+    const client = this.pendingModules.get(module.macAddress);
+    if (client && client.readyState === WebSocket.OPEN) {
+      // Move from pending to connected
+      this.pendingModules.delete(module.macAddress);
+      this.connectedModules.set(module.id, client);
+
+      // Send success response to ESP32
+      this.sendMessage(client, {
+        type: 'module-registered',
+        moduleId: module.id,
+        macAddress: module.macAddress,
+        message: 'Module registered successfully',
+      });
+
+      console.log(`Notified module ${module.id} of successful registration.`);
+      return true;
+    } else {
+      console.warn(
+        `Could not notify module with MAC ${module.macAddress}, it might be disconnected.`,
+      );
+      return false;
+    }
   }
 
   // Method to send commands to modules from admin interface

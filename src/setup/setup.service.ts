@@ -1,4 +1,9 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateModuleDto } from './dto/create-module.dto';
 import { RegisterModuleToAdminDto } from './dto/register-module-to-admin.dto';
@@ -6,10 +11,15 @@ import { InvalidOtpException } from './exceptions/invalid-otp.exception';
 import { FindModuleByMacAddressDto } from './dto/find-module-by-mac-address.dto';
 import { nanoid } from 'nanoid';
 import * as otpGenerator from 'otp-generator';
+import { ModuleGateway } from 'src/module/module.gateway';
 
 @Injectable()
 export class SetupService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => ModuleGateway))
+    private moduleGateway: ModuleGateway,
+  ) {}
   async generateOtpForModule(macAddress: string) {
     const possibleExistingOtp = await this.prisma.oneTimePassword.findFirst({
       where: {
@@ -132,6 +142,9 @@ export class SetupService {
     if (!updatedModule) {
       throw new InternalServerErrorException();
     }
+
+    // Notify the module via WebSocket that it has been registered
+    this.moduleGateway.notifyModuleRegistered(updatedModule);
 
     return updatedModule;
   }
