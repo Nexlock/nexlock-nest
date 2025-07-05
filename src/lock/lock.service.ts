@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ToggleLockDto } from './dto/toggle-lock.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { ModuleGateway } from 'src/module/module.gateway';
 
 @Injectable()
 export class LockService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private moduleGateway: ModuleGateway,
+  ) {}
 
   /**
    * Toggles the lock state of a locker.
@@ -28,6 +32,13 @@ export class LockService {
       data: { isOpen: !locker.isOpen },
       include: { module: true },
     });
+
+    // Send lock/unlock command to the connected module
+    this.moduleGateway.sendLockCommand(
+      updatedLocker.moduleId,
+      updatedLocker.id,
+      !updatedLocker.isOpen, // Send lock command if locker should be locked (isOpen = false)
+    );
 
     return updatedLocker;
   }
@@ -53,6 +64,13 @@ export class LockService {
       include: { module: true },
     });
 
+    // Send lock command to the connected module
+    this.moduleGateway.sendLockCommand(
+      updatedLocker.moduleId,
+      updatedLocker.id,
+      true,
+    );
+
     return updatedLocker;
   }
 
@@ -76,6 +94,13 @@ export class LockService {
       data: { isOpen: true },
       include: { module: true },
     });
+
+    // Send unlock command to the connected module
+    this.moduleGateway.sendLockCommand(
+      updatedLocker.moduleId,
+      updatedLocker.id,
+      false,
+    );
 
     return updatedLocker;
   }
