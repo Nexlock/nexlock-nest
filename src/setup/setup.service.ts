@@ -37,6 +37,7 @@ export class SetupService {
     const oneTimePassword = await this.prisma.oneTimePassword.create({
       data: {
         otp,
+        isUsed: false,
         expiresAt: new Date(Date.now() + 15 * 60 * 1000), // OTP valid for 15 minutes
         module: {
           connectOrCreate: {
