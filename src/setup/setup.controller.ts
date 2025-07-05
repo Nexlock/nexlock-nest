@@ -7,6 +7,8 @@ import {
   Post,
   Request,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { SetupService } from './setup.service';
 import { CreateModuleDto } from './dto/create-module.dto';
@@ -18,12 +20,13 @@ import { FindModuleByMacAddressDto } from './dto/find-module-by-mac-address.dto'
 export class SetupController {
   constructor(private setupService: SetupService) {}
 
-  @Post('create')
+  @Post('create-module')
+  @UseGuards(JwtAdminAuthGuard)
   async createModule(@Body() createModuleDto: CreateModuleDto) {
     return this.setupService.createModule(createModuleDto);
   }
 
-  @Post('register')
+  @Post('register-module-to-admin')
   @UseGuards(JwtAdminAuthGuard)
   async registerModuleToAdmin(
     @Request() req: any,
@@ -50,25 +53,63 @@ export class SetupController {
   }
 
   @Get('check/:macAddress')
-  async checkModuleSetup(@Param('macAddress') macAddress: string) {
-    return this.setupService.checkModuleRegistration(macAddress);
+  async checkModuleStatus(@Param('macAddress') macAddress: string) {
+    try {
+      const result =
+        await this.setupService.checkModuleRegistration(macAddress);
+      return {
+        exists: result.exists,
+        isRegistered: result.isRegistered,
+        moduleId: result.moduleId,
+      };
+    } catch (error) {
+      return {
+        exists: false,
+        isRegistered: false,
+        moduleId: null,
+      };
+    }
   }
 
   @Post('initialize/:macAddress')
+  @HttpCode(HttpStatus.OK)
   async initializeModule(@Param('macAddress') macAddress: string) {
-    const module =
-      await this.setupService.findOrCreateModuleByMacAddress(macAddress);
+    try {
+      console.log(`Initializing module with MAC: ${macAddress}`);
 
-    if (!module) {
-      throw new NotFoundException();
+      // Find or create module
+      const module =
+        await this.setupService.findOrCreateModuleByMacAddress(macAddress);
+
+      if (!module) {
+        console.error(`Module with MAC ${macAddress} not found or created.`);
+        throw new NotFoundException(
+          `Module with MAC address ${macAddress} not found.`,
+        );
+      }
+
+      // Generate OTP
+      const oneTimePassword =
+        await this.setupService.generateOtpForModule(macAddress);
+
+      console.log(
+        `Generated OTP for module ${macAddress}: ${oneTimePassword.otp}`,
+      );
+
+      return {
+        otp: oneTimePassword.otp,
+        module: {
+          id: module.id,
+          macAddress: module.macAddress,
+        },
+        lockers: module.lockers.map((locker) => ({
+          id: locker.id,
+          isOpen: locker.isOpen,
+        })),
+      };
+    } catch (error) {
+      console.error('Failed to initialize module:', error);
+      throw error;
     }
-
-    const otp = await this.setupService.generateOtpForModule(macAddress);
-
-    return {
-      module,
-      otp: otp.otp,
-      lockers: module.lockers,
-    };
   }
 }

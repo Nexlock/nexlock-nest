@@ -1,9 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { SetupModuleInfoDto } from './dto/setup-module-info.dto';
 
 @Injectable()
 export class ModuleService {
   constructor(private prisma: PrismaService) {}
+  async setupModuleInfo(
+    moduleId: string,
+    setupModuleInfoDto: SetupModuleInfoDto,
+  ) {
+    const module = await this.prisma.module.update({
+      where: {
+        id: moduleId,
+      },
+      data: {
+        ...setupModuleInfoDto,
+      },
+    });
+
+    return module;
+  }
+
   async getModuleStatus(macAddress: string) {
     const module = await this.prisma.module.findUnique({
       where: {

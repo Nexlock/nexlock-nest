@@ -1,8 +1,5 @@
 import {
-  MessageBody,
-  SubscribeMessage,
   WebSocketGateway,
-  ConnectedSocket,
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -24,6 +21,20 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleConnection(client: WebSocket) {
     console.log('WebSocket client connected');
+
+    // Handle raw WebSocket messages (not Socket.IO)
+    client.on('message', async (data: WebSocket.Data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        await this.handleRawMessage(client, message);
+      } catch (error) {
+        console.error('Failed to parse WebSocket message:', error);
+        this.sendMessage(client, {
+          type: 'error',
+          message: 'Invalid JSON format',
+        });
+      }
+    });
   }
 
   handleDisconnect(client: WebSocket) {
@@ -39,18 +50,47 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  @SubscribeMessage('module-register')
-  async handleModuleRegister(
-    @ConnectedSocket() client: WebSocket,
-    @MessageBody() data: { macAddress: string; otp: string },
+  private async handleRawMessage(client: WebSocket, message: any) {
+    console.log('Received raw WebSocket message:', message);
+
+    if (!message.type) {
+      console.error('Message missing type field:', message);
+      return;
+    }
+
+    switch (message.type) {
+      case 'module-register':
+        await this.handleModuleRegister(client, message);
+        break;
+      case 'locker-status-update':
+        await this.handleLockerStatusUpdate(client, message);
+        break;
+      case 'module-status':
+        await this.handleModuleStatus(client, message);
+        break;
+      case 'ping':
+        await this.handlePing(client, message);
+        break;
+      default:
+        console.log('Unknown message type:', message.type);
+        this.sendMessage(client, {
+          type: 'error',
+          message: 'Unknown message type',
+        });
+    }
+  }
+
+  private async handleModuleRegister(
+    client: WebSocket,
+    data: { macAddress: string; otp: string },
   ) {
     console.log('Module registration attempt:', data);
 
     try {
       // Verify OTP and get the module
       const oneTimePassword = await this.setupService.findValidOtp(
-        data.otp, // Changed: otp should be first parameter
-        data.macAddress, // Changed: macAddress should be second parameter
+        data.otp,
+        data.macAddress,
       );
 
       if (!oneTimePassword) {
@@ -58,7 +98,7 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
           type: 'registration-failed',
           error: 'Invalid or expired OTP',
         });
-        return { success: false, error: 'Invalid or expired OTP' };
+        return;
       }
 
       // Mark OTP as used
@@ -67,34 +107,34 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Store the client with module mapping
       this.connectedModules.set(oneTimePassword.module.id, client);
 
-      // This message IS sent to the ESP32 module
+      // Send success response to ESP32
       this.sendMessage(client, {
         type: 'module-registered',
         moduleId: oneTimePassword.module.id,
-        macAddress: oneTimePassword.module.macAddress, // Added: include macAddress
+        macAddress: oneTimePassword.module.macAddress,
         message: 'Module registered successfully',
       });
 
       console.log(
         `Module ${oneTimePassword.module.id} registered successfully`,
       );
-
-      return { success: true, moduleId: oneTimePassword.module.id };
     } catch (error) {
       console.error('Registration error:', error);
       this.sendMessage(client, {
         type: 'registration-failed',
         error: 'Registration failed',
       });
-      return { success: false, error: 'Registration failed' };
     }
   }
 
-  @SubscribeMessage('locker-status-update')
-  async handleLockerStatusUpdate(
-    @ConnectedSocket() client: WebSocket,
-    @MessageBody()
-    data: { moduleId: string; lockerId: string; isOpen: boolean },
+  private async handleLockerStatusUpdate(
+    client: WebSocket,
+    data: {
+      moduleId: string;
+      lockerId: string;
+      isOpen: boolean;
+      timestamp?: number;
+    },
   ) {
     console.log('Locker status update:', data);
 
@@ -103,45 +143,46 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.sendMessage(client, {
         type: 'status-update-ack',
         success: true,
+        lockerId: data.lockerId,
+        timestamp: Date.now(),
       });
-      return { success: true };
     } catch (error) {
       console.error('Failed to update locker status:', error);
       this.sendMessage(client, {
         type: 'status-update-ack',
         success: false,
         error: 'Failed to update status',
+        lockerId: data.lockerId,
       });
-      return { success: false, error: 'Failed to update status' };
     }
   }
 
-  @SubscribeMessage('module-status')
-  async handleModuleStatus(
-    @ConnectedSocket() client: WebSocket,
-    @MessageBody() data: { moduleId: string; macAddress: string; status: any },
+  private async handleModuleStatus(
+    client: WebSocket,
+    data: {
+      moduleId: string;
+      macAddress: string;
+      status: any;
+      timestamp?: number;
+    },
   ) {
     console.log('Module status update:', data);
 
     this.sendMessage(client, {
       type: 'status-received',
       received: true,
+      timestamp: Date.now(),
     });
-
-    return { received: true };
   }
 
-  @SubscribeMessage('ping')
-  async handlePing(
-    @ConnectedSocket() client: WebSocket,
-    @MessageBody() data: { moduleId: string },
+  private async handlePing(
+    client: WebSocket,
+    data: { moduleId?: string; timestamp?: number },
   ) {
     this.sendMessage(client, {
       type: 'pong',
       timestamp: Date.now(),
     });
-
-    return { type: 'pong', timestamp: Date.now() };
   }
 
   // Method to send commands to modules from admin interface
@@ -157,8 +198,10 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
       console.log(
         `Sent ${eventName} to module ${moduleId} for locker ${lockerId}`,
       );
+      return true;
     } else {
       console.log(`Module ${moduleId} not connected or not ready`);
+      return false;
     }
   }
 
@@ -190,7 +233,11 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private sendMessage(client: WebSocket, message: any) {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify(message));
+      try {
+        client.send(JSON.stringify(message));
+      } catch (error) {
+        console.error('Failed to send message to client:', error);
+      }
     }
   }
 }
