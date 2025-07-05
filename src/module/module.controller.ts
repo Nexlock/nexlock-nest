@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  Inject,
+  forwardRef,
   Param,
   Post,
   Query,
@@ -20,6 +22,7 @@ import { ModuleGateway } from './module.gateway';
 @Controller('module')
 export class ModuleController {
   constructor(
+    @Inject(forwardRef(() => SetupService))
     private setupService: SetupService,
     private moduleService: ModuleService,
     private moduleGateway: ModuleGateway,

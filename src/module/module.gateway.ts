@@ -8,6 +8,7 @@ import { Server } from 'ws';
 import * as WebSocket from 'ws';
 import { SetupService } from '../setup/setup.service';
 import { Module } from '@prisma/client';
+import { Inject, forwardRef } from '@nestjs/common';
 
 @WebSocketGateway({
   path: '/ws',
@@ -19,7 +20,10 @@ export class ModuleGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private connectedModules = new Map<string, WebSocket>();
   private pendingModules = new Map<string, WebSocket>(); // MAC -> WebSocket
 
-  constructor(private setupService: SetupService) {}
+  constructor(
+    @Inject(forwardRef(() => SetupService))
+    private setupService: SetupService,
+  ) {}
 
   handleConnection(client: WebSocket) {
     console.log('WebSocket client connected');
