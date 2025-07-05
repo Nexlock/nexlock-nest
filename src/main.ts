@@ -9,17 +9,11 @@ async function bootstrap() {
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     preflightContinue: false,
   });
-  app.useWebSocketAdapter(
-    new WsAdapter(app, {
-      messageParser: (data) => {
-        try {
-          return JSON.parse(data.toString());
-        } catch (e) {
-          return data; // Return as is if parsing fails
-        }
-      },
-    }),
-  );
+
+  // Configure WebSocket adapter for raw WebSocket connections
+  app.useWebSocketAdapter(new WsAdapter(app));
+
   await app.listen(process.env.NEST_PORT ?? 3479);
+  console.log(`Application is running on: ${await app.getUrl()}`);
 }
 bootstrap();
