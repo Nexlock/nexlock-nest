@@ -5,7 +5,7 @@ import { RegisterModuleToAdminDto } from './dto/register-module-to-admin.dto';
 import { InvalidOtpException } from './exceptions/invalid-otp.exception';
 import { FindModuleByMacAddressDto } from './dto/find-module-by-mac-address.dto';
 import { nanoid } from 'nanoid';
-import otpGenerator from 'otp-generator';
+import * as otpGenerator from 'otp-generator';
 
 @Injectable()
 export class SetupService {
