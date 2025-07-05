@@ -37,6 +37,12 @@ export class ModuleController {
     return this.moduleService.setupModuleInfo(moduleId, setupModuleInfoDto);
   }
 
+  @UseGuards(JwtAdminAuthGuard)
+  @Get(':moduleId')
+  async getModule(@Param('moduleId') moduleId: string) {
+    return this.moduleService.getModuleById(moduleId);
+  }
+
   @Get('status/:macAddress')
   async getStatus(@Param('macAddress') macAddress: string) {
     try {
