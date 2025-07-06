@@ -22,10 +22,6 @@ export class UserService {
       where: { email },
     });
 
-    if (!user) {
-      throw new UserNotFoundException();
-    }
-
     return user;
   }
 
@@ -35,7 +31,7 @@ export class UserService {
     });
 
     if (!user) {
-      throw new UserNotFoundException();
+      throw new InvalidCredentialsException();
     }
 
     const validPassword = await argon2.verify(user.password, password);
