@@ -11,6 +11,7 @@ import { UserService } from './user.service';
 import { ZodValidationPipe } from 'src/common';
 import { RegisterUserDto, registerUserSchema } from './dto/register-user.dto';
 import { LocalUserAuthGuard } from './guards/local-user-auth.guard';
+import { JwtUserAuthGuard } from './guards/jwt-user-auth.guard';
 
 @Controller('user')
 export class UserController {
@@ -28,6 +29,7 @@ export class UserController {
     return this.userService.login(req.user);
   }
 
+  @UseGuards(JwtUserAuthGuard)
   @Get('info')
   async getUserInfo(@Request() req: { user: any }) {
     const user = req.user;
