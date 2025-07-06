@@ -100,6 +100,12 @@ export class ModuleGateway
       case 'ping':
         await this.handlePing(client, message);
         break;
+      case 'get-connection-status':
+        await this.handleGetConnectionStatus(client, message);
+        break;
+      case 'get-module-status':
+        await this.handleGetModuleStatus(client, message);
+        break;
       default:
         console.log('Unknown message type:', message.type);
         this.sendMessage(client, {
@@ -107,6 +113,39 @@ export class ModuleGateway
           message: 'Unknown message type',
         });
     }
+  }
+
+  private async handleGetConnectionStatus(client: WebSocket, message: any) {
+    console.log('Handling get-connection-status request');
+    const connectedModules = this.getConnectedModules();
+
+    this.sendMessage(client, {
+      type: 'connection-status-response',
+      connectedModules,
+      timestamp: Date.now(),
+    });
+  }
+
+  private async handleGetModuleStatus(client: WebSocket, message: any) {
+    console.log('Handling get-module-status request for:', message.moduleId);
+    const moduleId = message.moduleId;
+
+    if (!moduleId) {
+      this.sendMessage(client, {
+        type: 'error',
+        message: 'Module ID is required',
+      });
+      return;
+    }
+
+    const isConnected = this.isModuleConnected(moduleId);
+
+    this.sendMessage(client, {
+      type: 'module-status-response',
+      moduleId,
+      isConnected,
+      timestamp: Date.now(),
+    });
   }
 
   private async handleModuleConnect(
