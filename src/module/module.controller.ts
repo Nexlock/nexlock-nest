@@ -16,8 +16,12 @@ import { JwtAdminAuthGuard } from 'src/admin-auth/guards/jwt-admin-auth.guard';
 import { ModuleService } from './module.service';
 import { JwtUserAuthGuard } from 'src/user/guards/jwt-user-auth.guard';
 import { SetupModuleInfoDto } from './dto/setup-module-info.dto';
-import { ToggleLockEventDto } from './dto/toggle-lock-event.dto';
+import {
+  ToggleLockEventDto,
+  ToggleLockEventForUserDto,
+} from './dto/toggle-lock-event.dto';
 import { ModuleGateway } from './module.gateway';
+import { SearchByLocationDto } from './dto/search-by-location.dto';
 
 @Controller('module')
 export class ModuleController {
@@ -25,7 +29,6 @@ export class ModuleController {
     @Inject(forwardRef(() => SetupService))
     private setupService: SetupService,
     private moduleService: ModuleService,
-    private moduleGateway: ModuleGateway,
   ) {}
 
   @Post('setup/:moduleId')
@@ -37,24 +40,10 @@ export class ModuleController {
     return this.moduleService.setupModuleInfo(moduleId, setupModuleInfoDto);
   }
 
+  // Can be used by user or admin
   @Get('status/:macAddress')
   async getStatus(@Param('macAddress') macAddress: string) {
-    try {
-      const module = await this.setupService.findModuleByMacAddress({
-        macAddress,
-      });
-      return {
-        exists: true,
-        isRegistered: !!module.adminId,
-        lockers: module.lockers || [],
-      };
-    } catch (error) {
-      return {
-        exists: false,
-        isRegistered: false,
-        lockers: [],
-      };
-    }
+    return this.moduleService.getStatus(macAddress);
   }
 
   @Get('admin')
@@ -86,64 +75,42 @@ export class ModuleController {
     @Body() toggleLockEventDto: ToggleLockEventDto,
   ) {
     const adminId = req.user.id;
+    return this.moduleService.toggleLockEvent(adminId, toggleLockEventDto);
+  }
 
-    try {
-      // Find module by MAC address
-      const module = await this.setupService.findModuleByMacAddress({
-        macAddress: toggleLockEventDto.macAddress,
-      });
+  @Post('toggle-lock/user')
+  @UseGuards(JwtUserAuthGuard)
+  async toggleLockForUser(
+    @Request() req: any,
+    @Body() toggleLockEventForUser: ToggleLockEventForUserDto,
+  ) {
+    const userId = req.user.id;
+    return this.moduleService.toggleLockEventForUser(
+      userId,
+      toggleLockEventForUser,
+    );
+  }
 
-      // Verify admin owns this module
-      if (module.adminId !== adminId) {
-        throw new BadRequestException('Module does not belong to this admin');
-      }
-
-      // Find the locker
-      const locker = module.lockers.find(
-        (l) => l.id === toggleLockEventDto.lockerId,
-      );
-      if (!locker) {
-        throw new BadRequestException('Locker not found');
-      }
-
-      // Check if module is connected
-      if (!this.moduleGateway.isModuleConnected(module.id)) {
-        throw new BadRequestException('Module is not connected');
-      }
-
-      // Send command to module
-      const shouldLock = !toggleLockEventDto.isOpen;
-      const success = this.moduleGateway.sendLockCommand(
-        module.id,
-        toggleLockEventDto.lockerId,
-        shouldLock,
-      );
-
-      if (!success) {
-        throw new BadRequestException('Failed to send command to module');
-      }
-
-      return {
-        success: true,
-        message: `${shouldLock ? 'Lock' : 'Unlock'} command sent successfully`,
-        lockerId: toggleLockEventDto.lockerId,
-        requestedState: toggleLockEventDto.isOpen,
-      };
-    } catch (error) {
-      console.error('Toggle lock error:', error);
-      throw error;
-    }
+  @UseGuards(JwtUserAuthGuard)
+  @Get('user/:moduleId')
+  async getModuleForUser(@Param('moduleId') moduleId: string) {
+    return this.moduleService.getModuleById(moduleId);
   }
 
   @Get('connection-status/:moduleId')
   @UseGuards(JwtAdminAuthGuard)
   async getConnectionStatus(@Param('moduleId') moduleId: string) {
-    const isConnected = this.moduleGateway.isModuleConnected(moduleId);
-    return {
-      moduleId,
-      isConnected,
-      connectedModules: this.moduleGateway.getConnectedModules(),
-    };
+    return this.moduleService.getConnectionStatus(moduleId);
+  }
+
+  @Post('search')
+  @UseGuards(JwtUserAuthGuard)
+  async searchModules(@Body() searchByLocationDto: SearchByLocationDto) {
+    return this.moduleService.browseModulesByLocation(
+      searchByLocationDto.latitude,
+      searchByLocationDto.longitude,
+      searchByLocationDto.radius,
+    );
   }
 
   @UseGuards(JwtAdminAuthGuard)

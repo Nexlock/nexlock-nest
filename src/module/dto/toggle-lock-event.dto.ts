@@ -7,3 +7,12 @@ export const toggleLockEventSchema = z.object({
 });
 
 export type ToggleLockEventDto = z.infer<typeof toggleLockEventSchema>;
+
+export const toggleLockEventForUserSchema = z.object({
+  lockerId: z.string().min(1, 'Locker ID is required'),
+  isOpen: z.boolean(),
+});
+
+export type ToggleLockEventForUserDto = z.infer<
+  typeof toggleLockEventForUserSchema
+>;

@@ -10,10 +10,14 @@ import {
 import { RentalService } from './rental.service';
 import { JwtUserAuthGuard } from 'src/user/guards/jwt-user-auth.guard';
 import { JwtAdminAuthGuard } from 'src/admin-auth/guards/jwt-admin-auth.guard';
+import { ModuleService } from 'src/module/module.service';
 
 @Controller('rental')
 export class RentalController {
-  constructor(private rentalService: RentalService) {}
+  constructor(
+    private rentalService: RentalService,
+    private moduleService: ModuleService,
+  ) {}
 
   @UseGuards(JwtAdminAuthGuard)
   @Post('checkout/force/:lockerId')
@@ -77,5 +81,21 @@ export class RentalController {
   async rentLocker(@Param('lockerId') lockerId: string, @Request() req: any) {
     const userId = req.user.id;
     return this.rentalService.rentLocker(lockerId, userId);
+  }
+
+  @UseGuards(JwtUserAuthGuard)
+  @Get('active')
+  async getActiveRentals(@Request() req: any) {
+    const userId = req.user.id;
+    return this.rentalService.getActiveRentalsByUserId(userId);
+  }
+
+  @UseGuards(JwtUserAuthGuard)
+  @Get(':rentalId')
+  async getRentalById(
+    @Param('rentalId') rentalId: string,
+    @Request() req: any,
+  ) {
+    return this.rentalService.getRentalById(rentalId);
   }
 }

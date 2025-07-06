@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { LockService } from 'src/lock/lock.service';
+import { ModuleService } from 'src/module/module.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
@@ -95,7 +96,7 @@ export class RentalService {
       where: { userId },
       include: { locker: true },
     });
-    return rentals;
+    return rentals || [];
   }
 
   async getRentalHistoryByLockerId(lockerId: string, limit = 5) {
@@ -107,7 +108,7 @@ export class RentalService {
       take: limit,
       include: { user: { select: { name: true, email: true } } },
     });
-    return rentals;
+    return rentals || [];
   }
 
   async getRentalById(rentalId: string) {
@@ -123,7 +124,7 @@ export class RentalService {
       where: { userId, endTime: null },
       include: { locker: true },
     });
-    return rentals;
+    return rentals || [];
   }
 
   async getActiveRentalsByLockerId(lockerId: string) {
@@ -131,7 +132,7 @@ export class RentalService {
       where: { lockerId, endTime: null },
       include: { user: true },
     });
-    return rentals;
+    return rentals || [];
   }
 
   async getActiveRentalsByModuleId(moduleId: string) {
@@ -139,7 +140,7 @@ export class RentalService {
       where: { locker: { moduleId }, endTime: null },
       include: { user: true, locker: true },
     });
-    return rentals;
+    return rentals || [];
   }
 
   async getAllActiveRentalsByModuleId(moduleId: string) {
@@ -147,7 +148,7 @@ export class RentalService {
       where: { locker: { moduleId }, endTime: null },
       include: { user: true, locker: true },
     });
-    return rentals;
+    return rentals || [];
   }
 
   async getAllActiveRentalsByLockerId(lockerId: string) {
@@ -155,6 +156,6 @@ export class RentalService {
       where: { lockerId, endTime: null },
       include: { user: true },
     });
-    return rentals;
+    return rentals || [];
   }
 }
