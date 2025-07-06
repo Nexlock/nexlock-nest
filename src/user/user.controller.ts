@@ -31,7 +31,7 @@ export class UserController {
 
   @UseGuards(JwtUserAuthGuard)
   @Get('info')
-  async getUserInfo(@Request() req: { user: any }) {
+  async getUserInfo(@Request() req: any) {
     const user = req.user;
     return user;
   }

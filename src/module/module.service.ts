@@ -253,4 +253,35 @@ export class ModuleService {
 
     return modules;
   }
+
+  async getLockerById(lockerId: string) {
+    const locker = await this.prisma.locker.findUnique({
+      where: {
+        id: lockerId,
+      },
+      include: {
+        module: true,
+        lockerRental: {
+          where: {
+            endTime: null, // Only active rentals
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!locker) {
+      return null;
+    }
+
+    return locker;
+  }
 }

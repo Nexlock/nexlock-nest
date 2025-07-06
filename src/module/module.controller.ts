@@ -68,6 +68,12 @@ export class ModuleController {
     };
   }
 
+  @UseGuards(JwtUserAuthGuard)
+  @Get('locker/:lockerId')
+  async getLockerById(@Param('lockerId') lockerId: string) {
+    return this.moduleService.getLockerById(lockerId);
+  }
+
   @Post('toggle-lock')
   @UseGuards(JwtAdminAuthGuard)
   async toggleLock(
